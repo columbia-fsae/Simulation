@@ -109,6 +109,8 @@ for i = 1:length(sectorIndex)
         CornerRadiusArray(i) = CornerRadius(a,b,c);
     end
 end
+
+format shortG
 CornerRadiusArray % Array of corner radius at each sector!
 % Straight sector radius = infinity
 %% Maximum Corner Velocity
