@@ -40,9 +40,9 @@ combinedforce = CombinedForce(dragforce,centriforce)
 
 endfosectorspeed = EndofSectorSpeed (1,1)
 
-Fs = DecelerativeForce (1,1) % parameter for MaxEntrySpeedBrake
-Fb = ForceAvailableBraking (1,1) % parameter for MaxEntrySpeedBrake
-u = MaxEntrySpeedBrake (Fs,1,1)
+Fs = DecelerativeForce (1,1) % parameter for MaxEntrySpeed
+Fb = BrakingForce (1,1) % parameter for MaxEntrySpeed
+u = MaxEntrySpeed (Fs,1,1)
 
 maxcornerspeedwing = MaxCornerSpeedWing (1) % parameter for StraightlineSpeedWing
 straightlinespeed = StraightlineSpeedWing (1,1) % parameter for StraightlineSpeedWing
@@ -80,7 +80,7 @@ end
             global Cd;
             global airdensity;
             global Af;
-            dragforce = Cd*(05)*airdensity*velocity^2*Af;
+            dragforce = Cd*(0.5)*airdensity*velocity^2*Af;
         end
 
         % Centripetal force
@@ -89,7 +89,16 @@ end
             centriforce = (mass*velocity^2)/radius;
         end
     
-% Acceleration from rest, straight sector, s = distance travelled,
+% Acceleration from rest, straight sector, u = entry speed
+function [a] = Acceleration(u)
+    global poweroutput;
+    global airdensity;
+    global Af;
+    global mass;
+    global Cd;
+    a = ((poweroutput/u)-0.5*airdensity*u^2*Af*Cd)/mass;
+end
+
 % u = entry speed
 function [endofsectorspeed] = EndofSectorSpeed (s,u)
     global poweroutput;
@@ -97,12 +106,12 @@ function [endofsectorspeed] = EndofSectorSpeed (s,u)
     global Af;
     global mass;
     global Cd;
-    endofsectorspeed = (u^2 + s*2*((poweroutput/u)-05*airdensity*u^2*Af*Cd)/mass)^(1/2);
+    endofsectorspeed = (u^2 + s*2*((poweroutput/u)-0.5*airdensity*u^2*Af*Cd)/mass)^(1/2);
 end
     
 % Combining Acceleration and Corners
     % Force available for braking
-    function [Fb] = ForceAvailableBraking (radius,velocity)
+    function [Fb] = BrakingForce (radius,velocity)
         global tirefriction;
         global R;
         global mass;
@@ -117,13 +126,13 @@ end
         global tirefriction;
         global mass;
         global R;
-        Fs = 05*airdensity*velocity^2*Af*Cd + (tirefriction^2*R^2 - mass^2*velocity^4/radius^2)^(1/2);
+        Fs = 0.5*airdensity*velocity^2*Af*Cd + (tirefriction^2*R^2 - mass^2*velocity^4/radius^2)^(1/2);
     end
     
     % Maximum entry speed u from which we could have braked
-    function [u] = MaxEntrySpeedBrake (Fs, velocity,s)
+    function [u] = MaxEntrySpeed (Fs, exitvelocity,s)
         global mass;
-        u = (velocity^2 + 2*s*Fs/mass)^(1/2);
+        u = (exitvelocity^2 + 2*s*Fs/mass)^(1/2);
     end
     
 % Wings, downforce and drag
@@ -138,7 +147,7 @@ end
         global Aw;
         global Cwd;
         global Cl;
-        maxcornerspeed = (tirefriction*mass*g)/(((mass/radius)^2 + (05*airdensity*(Af*Cd + Aw*Cwd))^2)^(1/2) - 0.5*tirefriction*airdensity*Aw*Cl);
+        maxcornerspeed = (tirefriction*mass*g)/(((mass/radius)^2 + (0.5*airdensity*(Af*Cd + Aw*Cwd))^2)^(1/2) - 0.5*tirefriction*airdensity*Aw*Cl);
     end
     
     % Straight line speed, with wings
