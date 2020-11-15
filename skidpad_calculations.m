@@ -1,35 +1,8 @@
 %% Skidpad Event XY Coordinates
 % Columbia FSAE
 
-% Create initial between points for straight line
+% Create initial between points for circle
 interval = 2*pi/360;
-
-% Length of the straight for the start of the event
-% NOTE: timing starts after the straight section is complete
-straight_start = (21.25/2) + 3; %3 meters is an estimation
-
-% Create start point for array (will be flipped later so we take max
-% length)
-y(1,1) = straight_start;
-j = 2; % counter
-
-% Loop to continually create data points increasing by interval
-while (straight_start - j*interval) >= 0
-    
-    y(j,1) = straight_start - j*interval;
-    
-    j = j + 1;
-    
-end 
-
-% Add start point or origin
-y(j,1) = 0;
-
-% Flip the array I build (recall it started at the end)
-y = flipud(y);
-% We only move in y direction, so make a vector of zeroes
-x = zeros(length(y),1);
-m = [x, y];
 
 % Create circles to reflect rest of course
 
@@ -48,6 +21,36 @@ right_laps = [right_laps(2:length(right_laps),:); right_laps(2:length(right_laps
 left_laps=r*[cos(theta')-C(1) sin(theta')+C(2)];% the points you asked
 left_laps = [left_laps(2:length(left_laps),:); left_laps(2:length(left_laps),:)];
 
+% Length of the straight for the start of the event
+% NOTE: timing starts after the straight section is complete
+straight_start = (21.25/2) + 3; %3 meters is an estimation
+
+% Create start point for array (will be flipped later so we take max
+% length)
+y(1,1) = straight_start;
+j = 1; % counter
+
+% Calculate total distance between points based on circle
+distance = sqrt((right_laps(2,1) - right_laps(1,1))^2 + (right_laps(2,2) - right_laps(1,2))^2);
+
+% Loop to continually create data points increasing by interval
+while (straight_start - j*distance) >= 0
+    
+    y(j+1,1) = straight_start - j*distance;
+    
+    j = j + 1;
+    
+end 
+
+% Add start point or origin
+% DELETING FOR NOW
+
+% Flip the array I build (recall it started at the end)
+y = flipud(y);
+% We only move in y direction, so make a vector of zeroes
+x = zeros(length(y),1);
+m = [x, y];
+
 % Shift circles
 right_laps(:,2) = right_laps(:,2) + m(length(m),2);
 left_laps(:,2) = left_laps(:,2) + m(length(m),2);
@@ -56,9 +59,9 @@ left_laps(:,2) = left_laps(:,2) + m(length(m),2);
 skidpad = [m; right_laps; left_laps];
 
 % Use plot to check results
-%hold on
-%axis equal
-%plot(skidpad(:,1), skidpad(:,2))
+% hold on
+% axis equal
+% plot(skidpad(:,1), skidpad(:,2))
 %% Car specs + Defining Sector
 global poweroutput; % power output of the car's engine
 global weight; % weight of the car
@@ -70,71 +73,152 @@ global airdensity; % density of air
 global R; % normal force on tire
 global g; % acceleration due to gravity
 
-% With Wings
-global Aw; % wing area
-global Cwd; % wing coefficient of drag
-global Cl; % wing coefficient of lift
-
 % Test Parameter Values
-poweroutput = 67.453411; % (bhp)
-weight = 2893.95;
-mass = 295; % 227kg +68kg driver
-tirefriction = 1;
+poweroutput = 50300; % Watts
+mass = 295; % 227kg+68kg driver
+tirefriction = 1.4; % taken from LPS pdf
 Af = 1.21;
 Cd = 0.74;
 airdensity  = 1.162;
 g = 9.81;
-R = 1;
-Aw = 1;
-Cwd = 1;
-Cl = 1;
+R = mass*g;
+weight = mass*g;
 
-% Every 20 points constitutes a sector
-sectorIndex = 0:20:length(skidpad);
+% Every 'interval' points constitute a sector
+interval = 3; % stop = 87, divisible by 3
+sectorIndex = 0:interval:length(skidpad);
 sectorIndex(1) = 1;
-sectorIndex;
+
+% Calculate index when timing starts, SKIDPAD SPECIFIC!
+for i = 1:length(skidpad)
+    if skidpad(i,1) ~= 0
+        index = i;
+        break;
+    end
+end
+stop = nearest(index/interval);
 %% Corner Radius
 % Creates an array of corner radius using sector lengths
 CornerRadiusArray = zeros(length(sectorIndex),1);
 for i = 1:length(sectorIndex)
     if i == 1
-        CornerRadiusArray(i) = 0;
+        CornerRadiusArray(i) = CornerRadiusArray(i+1);
     elseif i > length(sectorIndex) - 1
-        CornerRadiusArray(i) = 0;
+        CornerRadiusArray(i) = CornerRadiusArray(i-1);
     else
         a = sectorLength(skidpad(sectorIndex(i-1),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i-1),2),skidpad(sectorIndex(i+1),2)); % length from next sector to previous
         b = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2)); % current sector to next
         c = sectorLength(skidpad(sectorIndex(i-1),1),skidpad(sectorIndex(i),1),skidpad(sectorIndex(i-1),2),skidpad(sectorIndex(i),2)); % previous to current
-
+        CornerRadius(a,b,c);
         CornerRadiusArray(i) = CornerRadius(a,b,c);
     end
+    
 end
-
 format shortG
-CornerRadiusArray % Array of corner radius at each sector!
+CornerRadiusArray; % Array of corner radius at each sector!
 % Straight sector radius = infinity
 %% Maximum Corner Velocity
 % Creates an array of maximum corner velocity using corner radius, assuming
 % no downforce
-MaxCornerSpeedArray = zeros(length(sectorIndex),1);
+MaxCornerSpeed = zeros(length(sectorIndex),1);
 for i = 1:length(sectorIndex)
-    MaxCornerSpeedArray(i) = MaximumCornerSpeed(CornerRadiusArray(i));
+    MaxCornerSpeed(i) = MaximumCornerSpeed(CornerRadiusArray(i));
 end
-MaxCornerSpeedArray % Array of maximum corner speed at each sector!
+MaxCornerSpeed; % Array of maximum corner speed at each sector!
+%% Entry and Exit Speed, Braking (page 16)
+% Set up
+ExitSpeed = zeros(length(sectorIndex),1);
+for i = 1:length(sectorIndex)
+    ExitSpeed(i) = MaxCornerSpeed(i); % page 15 in LPT pdf
+end
+ExitSpeed; % unbraked
+
+EntrySpeed = zeros(length(sectorIndex),1);
+for i = 2:length(sectorIndex)
+    EntrySpeed(1) = 0.001; % start from rest
+    EntrySpeed(i) = ExitSpeed(i-1); % exit v of N = entry v for N+1
+end
+EntrySpeed; % unbraked
+
+% First pass
+for i = 1:length(sectorIndex)
+    if EntrySpeed(i) > MaxCornerSpeed(i) % need to brake
+        EntrySpeed(i) = MaxCornerSpeed(i);
+    end
+end
+
+% Second pass
+MaxEntry = zeros(length(sectorIndex),1);
+for i = length(sectorIndex)-1:-1:1
+    if EntrySpeed(i+1) < ExitSpeed(i)
+        % calculate max entry (exit speed = equal to the (braked) entry speed for sector N+1
+        s = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2));
+        MaxEntry(i) = MaxEntrySpeed(DecelerativeForce(CornerRadiusArray(i),EntrySpeed(i+1)),EntrySpeed(i+1),s);
+        if MaxEntry(i) > EntrySpeed(i) % transition to braking
+            ExitSpeed(i) = EntrySpeed(i+1);
+        else % maximum braking
+            EntrySpeed(i) = MaxEntry(i);
+            ExitSpeed(i) = EntrySpeed(i+1);
+        end
+    end
+    % calculate max entry (original exit speed)
+    s = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2));
+    MaxEntry(i) = MaxEntrySpeed(DecelerativeForce(CornerRadiusArray(i),ExitSpeed(i)),ExitSpeed(i),s);
+end
+EntrySpeed;
+ExitSpeed;
+MaxEntry;
 %% Top Speed for Straight Sector
 % Creates an array of maximum velocity for straight sectors using
 % s (distance travelled) and u (entry speed)
-MaxSpeedArray = zeros(length(sectorIndex),1);
+MaxStraightSpeed = zeros(length(sectorIndex),1);
 for i = 1:length(sectorIndex)
     if i > length(sectorIndex)+1
         slength = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2));
     else
         slength = 0;
     end
-    MaxSpeedArray(i) = EndofSectorSpeed(slength,MaxCornerSpeedArray(i)); 
-    % we take the corner speed as entry speed for now...
+    MaxStraightSpeed(i) = EndofSectorSpeed(slength,EntrySpeed(i)); 
 end
-MaxSpeedArray % Array of maximum speed at each straight sector!
+MaxStraightSpeed; % Array of maximum speed at each straight sector!
+%% Acceleration
+Acceleration = zeros(length(sectorIndex),1);
+for i = 1:length(sectorIndex)
+    Acceleration(i) = Acceleration1(EntrySpeed(i));
+end
+Acceleration;
+%% Elapsed Time 
+% From average speed through the current sector and the sector length, plus the sum of all previous sector elapsed times
+% average speed = (entry + exit)/2
+% time = speed*sector length
+elapsedtime = 0;
+for i = stop:length(sectorIndex)-1 % i = 1:length(sectorIndex)-1 for non-skidpad!
+    a = EntrySpeed(i);
+    b = ExitSpeed(i);
+    avgspeed = (EntrySpeed(i)+ExitSpeed(i))/2;
+    if avgspeed == 0
+        continue;
+    end
+    slength = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2));
+    elapsedtime = elapsedtime + slength/avgspeed;
+end
+elapsedtime;
+%% Distance Travelled
+totaldistance = 0;
+for i = 1:length(sectorIndex)-1
+    slength = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2));
+    totaldistance = totaldistance + slength;
+end
+totaldistance;
+%% Plot
+% a = 1:1:length(sectorIndex);
+% plot(a,CornerRadiusArray(a))
+% hold on
+% plot(a,MaxCornerSpeed(a))
+% plot(a,MaxStraightSpeed(a))
+% hold off
+% legend('Corner Radius','Maximum Speed (Corner)','Maximum Speed (Straight)')
+% axis([0 inf 0 40])
 %% Functions
 function [a] = sectorLength(x1,x2,y1,y2)
     a = ((x2 - x1)^2 + (y2 - y1)^2)^(1/2);
@@ -155,6 +239,15 @@ function [maxcornerspeed] = MaximumCornerSpeed(radius)
     maxcornerspeed = ((tirefriction*R)^2/((mass/radius)^2 + (0.5*airdensity*Af*Cd)^2))^(1/4);
 end
 
+function [a] = Acceleration1(u)
+    global poweroutput;
+    global airdensity;
+    global Af;
+    global mass;
+    global Cd;
+    a = ((poweroutput/u)-0.5*airdensity*u^2*Af*Cd)/mass;
+end
+
 function [endofsectorspeed] = EndofSectorSpeed (s,u)
     global poweroutput;
     global airdensity;
@@ -162,4 +255,19 @@ function [endofsectorspeed] = EndofSectorSpeed (s,u)
     global mass;
     global Cd;
     endofsectorspeed = (u^2 + s*2*((poweroutput/u)-0.5*airdensity*u^2*Af*Cd)/mass)^(1/2);
+end
+
+function [Fs] = DecelerativeForce (radius,velocity)
+    global airdensity;
+    global Af;
+    global Cd;
+    global tirefriction;
+    global mass;
+    global R;
+    Fs = 0.5*airdensity*velocity^2*Af*Cd + (tirefriction^2*R^2 - mass^2*velocity^4/radius^2)^(1/2);
+end
+
+function [u] = MaxEntrySpeed (Fs, exitvelocity,s)
+    global mass;
+    u = (exitvelocity^2 + 2*s*Fs/mass)^(1/2);
 end
