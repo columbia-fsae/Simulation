@@ -76,13 +76,13 @@ global g; % acceleration due to gravity
 % Test Parameter Values
 poweroutput = 50300; % Watts
 mass = 295; % 227kg+68kg driver
-tirefriction = 1.4; % taken from LPS pdf
+tirefriction = 1; % taken from LTS pdf
 Af = 1.21;
 Cd = 0.74;
 airdensity  = 1.162;
 g = 9.81;
 R = mass*g;
-weight = mass*g;
+weight = mass*g; % assuming 1 tire
 
 % Every 'interval' points constitute a sector
 interval = 3; % stop = 87, divisible by 3
@@ -109,8 +109,7 @@ for i = 1:length(sectorIndex)
         a = sectorLength(skidpad(sectorIndex(i-1),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i-1),2),skidpad(sectorIndex(i+1),2)); % length from next sector to previous
         b = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2)); % current sector to next
         c = sectorLength(skidpad(sectorIndex(i-1),1),skidpad(sectorIndex(i),1),skidpad(sectorIndex(i-1),2),skidpad(sectorIndex(i),2)); % previous to current
-        CornerRadius(a,b,c);
-        CornerRadiusArray(i) = CornerRadius(a,b,c);
+        CornerRadiusArray(i) = real(CornerRadius(a,b,c)); % consider only the real part
     end
     
 end
@@ -129,7 +128,7 @@ MaxCornerSpeed; % Array of maximum corner speed at each sector!
 % Set up
 ExitSpeed = zeros(length(sectorIndex),1);
 for i = 1:length(sectorIndex)
-    ExitSpeed(i) = MaxCornerSpeed(i); % page 15 in LPT pdf
+    ExitSpeed(i) = MaxCornerSpeed(i); % page 15 in LTS pdf
 end
 ExitSpeed; % unbraked
 
@@ -181,20 +180,19 @@ for i = 1:length(sectorIndex)
     MaxStraightSpeed(i) = EndofSectorSpeed(slength,EntrySpeed(i)); 
 end
 MaxStraightSpeed; % Array of maximum speed at each straight sector!
-%% Acceleration
-Acceleration = zeros(length(sectorIndex),1);
+%% Max Deceleration
+% braking acceleration -a = -Fs/m
+Deceleration = zeros(length(sectorIndex),1);
 for i = 1:length(sectorIndex)
-    Acceleration(i) = Acceleration1(EntrySpeed(i));
+    Deceleration(i) = (DecelerativeForce(CornerRadiusArray(i),ExitSpeed(i)))/(mass*g);
 end
-Acceleration;
+Deceleration;
 %% Elapsed Time 
 % From average speed through the current sector and the sector length, plus the sum of all previous sector elapsed times
 % average speed = (entry + exit)/2
 % time = speed*sector length
 elapsedtime = 0;
 for i = stop:length(sectorIndex)-1 % i = 1:length(sectorIndex)-1 for non-skidpad!
-    a = EntrySpeed(i);
-    b = ExitSpeed(i);
     avgspeed = (EntrySpeed(i)+ExitSpeed(i))/2;
     if avgspeed == 0
         continue;
@@ -204,21 +202,84 @@ for i = stop:length(sectorIndex)-1 % i = 1:length(sectorIndex)-1 for non-skidpad
 end
 elapsedtime;
 %% Distance Travelled
-totaldistance = 0;
+distance = zeros(length(sectorIndex),1);
+totaldis = 0;
 for i = 1:length(sectorIndex)-1
+    if i == 1 || i == length(sectorIndex)
+        continue;
+    end
+    
     slength = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2));
-    totaldistance = totaldistance + slength;
+    distance(i) = distance(i-1) + slength;
+    totaldis = totaldis + slength;
 end
-totaldistance;
+distance; % the matrix
+totaldis; % value
+%% Longitudinal and Lateral Acceleration
+% Longitudinal: the difference in entry and exit speeds, and the sector length
+longG = zeros(length(sectorIndex),1);
+for i = 1:length(sectorIndex)-1
+    speeddif = EntrySpeed(i)-ExitSpeed(i);
+    slength = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2));
+    time = slength/speeddif;
+    longG(i) = (speeddif/time)/g;
+end
+longG;
+
+% Lateral: average sector speed in the centripetal acceleration equation 
+latG = zeros(length(sectorIndex),1);
+for i = 1:length(sectorIndex)
+    speed = (EntrySpeed(i)+ExitSpeed(i)/2);
+    latG(i) = (CentriAcceleration(CornerRadiusArray(i),speed))/g;
+end
+latG;
+%% Wheel Speed (MPH)
+WheelSpeed = zeros(length(sectorIndex),1);
+for i = 1:length(sectorIndex)
+    WheelSpeed(i) = (3600*ExitSpeed(i))/1609.34;
+end
+WheelSpeed;
+%% Steering Angle
+% 180-A
+SteeringAngle = zeros(length(sectorIndex),1);
+for i = 1:length(sectorIndex)
+    if i == 1
+        SteeringAngle(i) = SteeringAngle(i+1);
+    elseif i > length(sectorIndex) - 1
+        SteeringAngle(i) = SteeringAngle(i-1);
+    else
+    a = sectorLength(skidpad(sectorIndex(i-1),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i-1),2),skidpad(sectorIndex(i+1),2)); % length from next sector to previous
+    b = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2)); % current sector to next
+    c = sectorLength(skidpad(sectorIndex(i-1),1),skidpad(sectorIndex(i),1),skidpad(sectorIndex(i-1),2),skidpad(sectorIndex(i),2)); % previous to current
+    SteeringAngle(i) = real((180 - angleA(a,b,c)));
+    end
+end
+SteeringAngle;
 %% Plot
-% a = 1:1:length(sectorIndex);
-% plot(a,CornerRadiusArray(a))
-% hold on
-% plot(a,MaxCornerSpeed(a))
-% plot(a,MaxStraightSpeed(a))
-% hold off
-% legend('Corner Radius','Maximum Speed (Corner)','Maximum Speed (Straight)')
-% axis([0 inf 0 40])
+a = distance(:,1);
+i = 1:length(sectorIndex);
+
+nexttile
+plot(a,WheelSpeed(i))
+hold on
+plot(a,latG(i))
+plot(a,longG(i))
+plot(a,Deceleration(i))
+hold off
+legend('Wheel Speed (MPH)','latG','longG','Max Deceleration')
+xlabel('Distance')
+xticks(0:20:length(sectorIndex))
+axis([0 Inf 0 Inf])
+
+nexttile
+plot(a,CornerRadiusArray(i))
+hold on
+plot(a,MaxCornerSpeed(i))
+plot(a,MaxStraightSpeed(i))
+hold off
+legend('Corner Radius','Maximum Speed (Corner)','Maximum Speed (Straight)')
+xticks(0:20:length(sectorIndex))
+axis([0 Inf 0 20])
 %% Functions
 function [a] = sectorLength(x1,x2,y1,y2)
     a = ((x2 - x1)^2 + (y2 - y1)^2)^(1/2);
@@ -229,6 +290,10 @@ function [radius] = CornerRadius (a,b,c)
     radius = a/(2*sind(180 - A));
 end
 
+function [A] = angleA (a,b,c)
+    A = acosd((b^2 + c^2 - a^2)/(2*b*c));
+end
+
 function [maxcornerspeed] = MaximumCornerSpeed(radius)
     global R;
     global tirefriction;
@@ -237,15 +302,6 @@ function [maxcornerspeed] = MaximumCornerSpeed(radius)
     global Af;
     global Cd;    
     maxcornerspeed = ((tirefriction*R)^2/((mass/radius)^2 + (0.5*airdensity*Af*Cd)^2))^(1/4);
-end
-
-function [a] = Acceleration1(u)
-    global poweroutput;
-    global airdensity;
-    global Af;
-    global mass;
-    global Cd;
-    a = ((poweroutput/u)-0.5*airdensity*u^2*Af*Cd)/mass;
 end
 
 function [endofsectorspeed] = EndofSectorSpeed (s,u)
@@ -270,4 +326,8 @@ end
 function [u] = MaxEntrySpeed (Fs, exitvelocity,s)
     global mass;
     u = (exitvelocity^2 + 2*s*Fs/mass)^(1/2);
+end
+
+function [centriacc] = CentriAcceleration (radius,velocity)
+    centriacc = (velocity^2)/radius;
 end

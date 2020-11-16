@@ -88,6 +88,10 @@ end
             global mass;
             centriforce = (mass*velocity^2)/radius;
         end
+        
+        function [centriacc] = CentriAcceleration (radius,velocity)
+            centriacc = (velocity^2)/radius;
+        end
     
 % Acceleration from rest, straight sector, u = entry speed
 function [a] = Acceleration(u)
