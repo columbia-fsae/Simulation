@@ -4,7 +4,7 @@
 
 If you wish to get the free Dymola tiral click [here](https://www.3ds.com/products-services/catia/products/dymola/trial-version/).
 
-If you using a Windows computer, you will need to have some C compiler installed on your device. If you have no such complier you can always install Miscrosoft Visual studio. Here is a [link](https://visualstudio.microsoft.com/vs/features/cplusplus/) to do just that.
+In order to use Dymola, you will need to have some C compiler installed on your device. If you have no such complier you can always install Miscrosoft Visual studio. Here is a [link](https://visualstudio.microsoft.com/vs/features/cplusplus/) to do just that.
 
 #### Learning about Dymola 
 
