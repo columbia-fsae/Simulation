@@ -84,12 +84,12 @@ g = 9.81;
 R = mass*g;
 weight = mass*g; % assuming 1 tire
 
-% Every 'interval' points constitute a sector
+% Every 'interval' point constitute a sector
 interval = 3; % stop = 87, divisible by 3
 sectorIndex = 0:interval:length(skidpad);
 sectorIndex(1) = 1;
 
-% Calculate index when timing starts, SKIDPAD SPECIFIC!
+% Calculate index when timing starts, skidpad SPECIFIC!
 for i = 1:length(skidpad)
     if skidpad(i,1) ~= 0
         index = i;
@@ -97,6 +97,9 @@ for i = 1:length(skidpad)
     end
 end
 stop = nearest(index/interval);
+if stop == 0
+    stop = 1;
+end
 %% Corner Radius
 % Creates an array of corner radius using sector lengths
 CornerRadiusArray = zeros(length(sectorIndex),1);
@@ -110,6 +113,10 @@ for i = 1:length(sectorIndex)
         b = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2)); % current sector to next
         c = sectorLength(skidpad(sectorIndex(i-1),1),skidpad(sectorIndex(i),1),skidpad(sectorIndex(i-1),2),skidpad(sectorIndex(i),2)); % previous to current
         CornerRadiusArray(i) = real(CornerRadius(a,b,c)); % consider only the real part
+    end
+    
+    if CornerRadiusArray(i) > 1000
+     CornerRadiusArray(i) = CornerRadiusArray(i-1); % if radius is too big due to transitions, set it to previous radius
     end
     
 end
@@ -179,7 +186,8 @@ for i = 1:length(sectorIndex)
     end
     MaxStraightSpeed(i) = EndofSectorSpeed(slength,EntrySpeed(i)); 
 end
-MaxStraightSpeed; % Array of maximum speed at each straight sector!
+MaxStraightSpeed(isnan(MaxStraightSpeed))=0;
+MaxStraightSpeed % Array of maximum speed at each straight sector!
 %% Max Deceleration
 % braking acceleration -a = -Fs/m
 Deceleration = zeros(length(sectorIndex),1);
@@ -192,15 +200,23 @@ Deceleration;
 % average speed = (entry + exit)/2
 % time = speed*sector length
 elapsedtime = 0;
+ElapsedTime = zeros(length(sectorIndex),1);
 for i = stop:length(sectorIndex)-1 % i = 1:length(sectorIndex)-1 for non-skidpad!
     avgspeed = (EntrySpeed(i)+ExitSpeed(i))/2;
     if avgspeed == 0
+        ElapsedTime(i) = elapsedtime;
         continue;
     end
     slength = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2));
+    ElapsedTime(i) = elapsedtime + slength/avgspeed;
     elapsedtime = elapsedtime + slength/avgspeed;
+    
+    if i == length(sectorIndex)-1
+        ElapsedTime(i+1) = ElapsedTime(i);
+    end
 end
-elapsedtime;
+elapsedtime
+ElapsedTime;
 %% Distance Travelled
 distance = zeros(length(sectorIndex),1);
 totaldis = 0;
@@ -223,6 +239,10 @@ for i = 1:length(sectorIndex)-1
     slength = sectorLength(skidpad(sectorIndex(i),1),skidpad(sectorIndex(i+1),1),skidpad(sectorIndex(i),2),skidpad(sectorIndex(i+1),2));
     time = slength/speeddif;
     longG(i) = (speeddif/time)/g;
+    
+    if longG(i) > 2
+     longG(i) = longG(i-1); % if radius is too big due to transitions, set it to previous radius
+    end
 end
 longG;
 
@@ -232,6 +252,7 @@ for i = 1:length(sectorIndex)
     speed = (EntrySpeed(i)+ExitSpeed(i)/2);
     latG(i) = (CentriAcceleration(CornerRadiusArray(i),speed))/g;
 end
+latG(isnan(latG))=0; % all NaN values become 0
 latG;
 %% Wheel Speed (MPH)
 WheelSpeed = zeros(length(sectorIndex),1);
@@ -255,31 +276,98 @@ for i = 1:length(sectorIndex)
     end
 end
 SteeringAngle;
+%% Sectioning Track & Plot
+sectionlength = nearest(length(sectorIndex)/6);
+begin1 = 1;
+end1 = sectionlength;
+begin2 = end1 + 1;
+end2 = begin2 + sectionlength;
+begin3 = end2 + 1;
+end3 = begin3 + sectionlength;
+begin4 = end3 + 1;
+end4 = begin4 + sectionlength;
+begin5 = end4 + 1;
+end5 = begin5 + sectionlength;
+begin6 = end5 + 1;
+end6 = length(skidpad);
+
+Track1 = zeros(end1-begin1,2);
+Track1 = skidpad(begin1:end1,1:2);
+
+Track2 = zeros(end2-begin2,2);
+Track2 = skidpad(begin2:end2,1:2);
+
+Track3 = zeros(end3-begin3,2);
+Track3 = skidpad(begin3:end3,1:2);
+
+Track4 = zeros(end4-begin4,2);
+Track4 = skidpad(begin4:end4,1:2);
+
+Track5 = zeros(end5-begin5,2);
+Track5 = skidpad(begin5:end5,1:2);
+
+Track6 = zeros(end6-begin6,2);
+Track6 = skidpad(begin6:end6,1:2);
+
+
+nexttile
+plot(Track1(:,1), Track1(:,2),'LineWidth',2.0);
+hold on
+plot(Track2(:,1), Track2(:,2),'LineWidth',2.0);
+plot(Track3(:,1), Track3(:,2),'LineWidth',2.0);
+plot(Track4(:,1), Track4(:,2),'LineWidth',2.0);
+plot(Track5(:,1), Track5(:,2),'LineWidth',2.0);
+plot(Track6(:,1), Track6(:,2),'LineWidth',2.0);
+hold off
 %% Plot
-a = distance(:,1);
+b = distance(:,1);
+a = ElapsedTime(:,1);
 i = 1:length(sectorIndex);
 
-nexttile
-plot(a,WheelSpeed(i))
+figure
+plot(a,WheelSpeed(i));
 hold on
-plot(a,latG(i))
-plot(a,longG(i))
-plot(a,Deceleration(i))
+xline(ElapsedTime(begin2));
+xline(ElapsedTime(begin3));
+xline(ElapsedTime(begin4));
+xline(ElapsedTime(begin5));
+%plot(a,Deceleration(i))
 hold off
-legend('Wheel Speed (MPH)','latG','longG','Max Deceleration')
-xlabel('Distance')
-xticks(0:20:length(sectorIndex))
+legend('Wheel Speed (MPH)') %,'Max Deceleration')
+xlabel('Time')
+xticks(0:10:length(sectorIndex))
 axis([0 Inf 0 Inf])
 
-nexttile
-plot(a,CornerRadiusArray(i))
+figure
+plot(a,Deceleration(i)');
 hold on
-plot(a,MaxCornerSpeed(i))
-plot(a,MaxStraightSpeed(i))
+plot(a,latG(i));
+plot(a,longG(i))
+xline(ElapsedTime(begin2));
+xline(ElapsedTime(begin3));
+xline(ElapsedTime(begin4));
+xline(ElapsedTime(begin5));
 hold off
-legend('Corner Radius','Maximum Speed (Corner)','Maximum Speed (Straight)')
-xticks(0:20:length(sectorIndex))
-axis([0 Inf 0 20])
+legend('Max Deceleration','Lateral G','Longitudinal G')
+xticks(0:10:length(sectorIndex))
+axis([0 Inf 0 Inf])
+xlabel('Time')
+
+figure
+plot(a,MaxCornerSpeed(i));
+hold on
+plot(a,MaxStraightSpeed(i));
+plot(a,EntrySpeed(i));
+plot(a,ExitSpeed(i))
+xline(ElapsedTime(begin2));
+xline(ElapsedTime(begin3));
+xline(ElapsedTime(begin4));
+xline(ElapsedTime(begin5));
+hold off
+legend('Max Corner Speed','Max Straight Speed','Entry Speed','Exit Speed')
+xlabel('Time')
+xticks(0:10:length(sectorIndex))
+axis([0 Inf 0 Inf])
 %% Functions
 function [a] = sectorLength(x1,x2,y1,y2)
     a = ((x2 - x1)^2 + (y2 - y1)^2)^(1/2);
