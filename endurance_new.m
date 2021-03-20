@@ -88,11 +88,11 @@ for i = 1:length(sectorIndex)
     MaxCornerSpeed(i) = MaximumCornerSpeed(CornerRadiusArray(i));
 end
 MaxCornerSpeed; % Array of maximum corner speed at each sector!
-%% Entry and Exit Speed, Braking (page 16)
+%% Entry and Exit Speed, Braking (page 16) (check this again)
 % Set up
 ExitSpeed = zeros(length(sectorIndex),1);
 for i = 1:length(sectorIndex)
-    ExitSpeed(i) = MaxCornerSpeed(i); % page 15 in LTS pdf
+    ExitSpeed(i) = MaxStraightSpeed(i); % page 15 in LTS pdf
 end
 ExitSpeed; % unbraked
 
@@ -131,7 +131,7 @@ end
 EntrySpeed;
 ExitSpeed;
 MaxEntry;
-%% Top Speed for Straight Sector
+%% Top Speed for Straight Sector (check this again)
 % Creates an array of maximum velocity for straight sectors using
 % s (distance travelled) and u (entry speed)
 MaxStraightSpeed = zeros(length(sectorIndex),1);
