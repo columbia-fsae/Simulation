@@ -88,20 +88,35 @@ for i = 1:length(sectorIndex)
     MaxCornerSpeed(i) = MaximumCornerSpeed(CornerRadiusArray(i));
 end
 MaxCornerSpeed; % Array of maximum corner speed at each sector!
-%% Entry and Exit Speed, Braking (page 16)
+%% Entry and Exit Speed, Braking (page 16) (check this again)
 % Set up
 ExitSpeed = zeros(length(sectorIndex),1);
 for i = 1:length(sectorIndex)
-    ExitSpeed(i) = MaxCornerSpeed(i); % page 15 in LTS pdf
+    ExitSpeed(i) = MaxStraightSpeed(i); % page 15 in LTS pdf
 end
 ExitSpeed; % unbraked
-
+%% Define Entry Speed
 EntrySpeed = zeros(length(sectorIndex),1);
 for i = 2:length(sectorIndex)
     EntrySpeed(1) = 0.001; % start from rest
     EntrySpeed(i) = ExitSpeed(i-1); % exit v of N = entry v for N+1
 end
 EntrySpeed; % unbraked
+%% Top Speed for Straight Sector (check this again)
+% Creates an array of maximum velocity for straight sectors using
+% s (distance travelled) and u (entry speed)
+MaxStraightSpeed = zeros(length(sectorIndex),1);
+for i = 1:length(sectorIndex)
+    if i > length(sectorIndex)+1
+        slength = sectorLength(endurance_track(sectorIndex(i),1),endurance_track(sectorIndex(i+1),1),endurance_track(sectorIndex(i),2),endurance_track(sectorIndex(i+1),2));
+    else
+        slength = 0;
+    end
+    MaxStraightSpeed(i) = EndofSectorSpeed(slength,EntrySpeed(i)); 
+end
+MaxStraightSpeed(isnan(MaxStraightSpeed))=0;
+MaxStraightSpeed; % Array of maximum speed at each straight sector!
+%%
 
 % First pass
 for i = 1:length(sectorIndex)
@@ -131,20 +146,6 @@ end
 EntrySpeed;
 ExitSpeed;
 MaxEntry;
-%% Top Speed for Straight Sector
-% Creates an array of maximum velocity for straight sectors using
-% s (distance travelled) and u (entry speed)
-MaxStraightSpeed = zeros(length(sectorIndex),1);
-for i = 1:length(sectorIndex)
-    if i > length(sectorIndex)+1
-        slength = sectorLength(endurance_track(sectorIndex(i),1),endurance_track(sectorIndex(i+1),1),endurance_track(sectorIndex(i),2),endurance_track(sectorIndex(i+1),2));
-    else
-        slength = 0;
-    end
-    MaxStraightSpeed(i) = EndofSectorSpeed(slength,EntrySpeed(i)); 
-end
-MaxStraightSpeed(isnan(MaxStraightSpeed))=0;
-MaxStraightSpeed % Array of maximum speed at each straight sector!
 %% Max Deceleration
 % braking acceleration -a = -Fs/m
 Deceleration = zeros(length(sectorIndex),1);
@@ -322,6 +323,21 @@ xline(ElapsedTime(begin4));
 xline(ElapsedTime(begin5));
 hold off
 legend('Max Corner Speed','Max Straight Speed','Entry Speed','Exit Speed')
+xlabel('Time')
+xticks(0:10:length(sectorIndex))
+axis([0 Inf 0 Inf])
+
+figure
+plot(a,endurance_track(1:length(a),1));
+hold on
+plot(a,endurance_track(1:length(a),2));
+plot(a,ExitSpeed(i))
+xline(ElapsedTime(begin2));
+xline(ElapsedTime(begin3));
+xline(ElapsedTime(begin4));
+xline(ElapsedTime(begin5));
+hold off
+legend('X','Y','Exit Speed')
 xlabel('Time')
 xticks(0:10:length(sectorIndex))
 axis([0 Inf 0 Inf])
